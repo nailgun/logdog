@@ -1,0 +1,150 @@
+'''
+logdog - system log maintenance tools
+'''
+
+import re
+import time
+import datetime
+
+class LogdogError(Exception):
+	pass
+
+class InvalidPattern(LogdogError):
+	pass
+
+class InvalidStrftime(LogdogError):
+	pass
+
+class LogRecord(dict):
+	def __init__(self, line, groups):
+		super(LogRecord, self).__init__(groups)
+		self.line = line
+	
+	def __str__(self):
+		return self.line
+
+class LogSource(object):
+	def __init__(self, file):
+		self.fields = dict()
+		self.file = file
+		self.record = None
+		self.regex = None
+	
+	def parse_line(self, line):
+		if line[-1] == '\n':
+			linenb = line[:-1]
+		else:
+			linenb = line
+		match = self.regex.search(linenb)
+		if not match:
+			raise InvalidPattern(
+				'pattern /%s/ does not found in line "%s"' % \
+					(self.pattern, linenb))
+
+		record = LogRecord(line, match.groupdict())
+		for field in self.fields.keys():
+			try:
+				string = record[field]
+			except KeyError:
+				pass
+			else:
+				record[field] = self.fields[field].parse(string)
+		return record
+
+	def next_record(self):
+		line = self.file.readline()
+		if line:
+			self.record = self.parse_line(line)
+			return True
+		else:
+			return False
+
+	@property
+	def pattern(self):
+		try:
+			return self.regex.pattern
+		except AttributeError:
+			return None
+
+	@pattern.setter	
+	def pattern(self, value):
+		self.regex = re.compile(value)
+
+class OutputFormat(object):
+	def __init__(self, template):
+		self.template = template
+		self.fields = dict()
+	
+	def format(self, record):
+		context = dict(record)
+		for field in self.fields.keys():
+			try:
+				value = context[field]
+			except KeyError:
+				pass
+			else:
+				context[field] = self.fields[field].format(value)
+		return self.template % context
+
+class OriginalFormat(OutputFormat):
+	def __init__(self):
+		pass
+
+	def format(self, record):
+		return str(record)
+
+class Field(object):
+	def parse(self, string):
+		return string
+
+	def format(self, value):
+		return value
+
+class StringField(Field):
+	pass
+
+class TimestampField(Field):
+	def __init__(self, strftime):
+		self.strftime = strftime
+
+	def parse(self, string):
+		try:
+			t = time.strptime(string, self.strftime)
+		except ValueError:
+			raise InvalidStrftime(
+				'invalid timestamp format "%s" for string "%s"' % \
+					(self.strftime, string))
+		return datetime.datetime(*tuple(t)[:6])
+
+	def format(self, value):
+		return time.strftime(self.strftime, value.timetuple())
+
+def fetch_records(config):
+	sources = list(config.SOURCES)
+	for src in config.SOURCES:
+		if not src.next_record():
+			sources.remove(src)
+	while sources:
+		src = min(sources, key=lambda x: x.record['ts'])
+		record = src.record
+		if not src.next_record():
+			sources.remove(src)
+		yield record
+
+def checklog(config, state=None):
+	records = fetch_records(config)
+	record = None
+
+	try:
+		last_check = state['last_checklog']
+	except KeyError:
+		pass
+	else:
+		for record in records:
+			if record['ts'] > last_check:
+				yield config.OUTPUT.format(record)
+				break
+	for record in records:
+		yield config.OUTPUT.format(record)
+	if record:
+		state['last_checklog'] = record['ts']

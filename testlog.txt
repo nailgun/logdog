@@ -1,0 +1,8 @@
+Oct 28 00:59:35 alpha usblp1: removed
+Oct 28 00:59:36 alpha usblp1: USB Bidirectional printer dev 24 if 0 alt 1 proto 2 vid 0x03F0 pid 0x1D17
+Oct 28 01:00:01 alpha cron[374]: (root) CMD (test -x /usr/sbin/run-crons && /usr/sbin/run-crons )
+Oct 28 01:04:24 alpha dhcpd: DHCPACK on 192.168.7.5 to 00:1b:77:42:dc:7e via lan
+Oct 28 01:10:01 alpha cron[396]: (root) CMD (test -x /usr/sbin/run-crons && /usr/sbin/run-crons )
+Oct 28 01:10:38 alpha sshd[409]: Accepted publickey for nailgun from 192.168.7.5 port 56263 ssh2
+Oct 28 01:10:45 alpha sudo:  nailgun : TTY=pts/1 ; PWD=/home/nailgun ; USER=root ; COMMAND=/usr/bin/less /var/log/messages
+Oct 28 01:10:48 alpha ntpd[1921]: synchronized to 81.200.8.213, stratum 3
