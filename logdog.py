@@ -106,6 +106,7 @@ class StringField(Field):
 class TimestampField(Field):
 	def __init__(self, strftime):
 		self.strftime = strftime
+		self.now = datetime.datetime.now()
 
 	def parse(self, string):
 		try:
@@ -114,25 +115,51 @@ class TimestampField(Field):
 			raise InvalidStrftime(
 				'invalid timestamp format "%s" for string "%s"' % \
 					(self.strftime, string))
-		return datetime.datetime(*tuple(t)[:6])
+		if t.tm_year == 1900:
+			ts = datetime.datetime(self.now.year, *tuple(t)[1:6])
+			if ts - self.now > datetime.timedelta(minutes=1):
+				ts = ts.replace(year=self.now.year-1)
+		else:
+			ts = datetime.datetime(*tuple(t)[:6])
+		return ts
 
 	def format(self, value):
 		return time.strftime(self.strftime, value.timetuple())
 
-def fetch_records(config):
-	sources = list(config.SOURCES)
-	for src in config.SOURCES:
+def get_new_records(sources):
+	sources_work = list(sources)
+	for src in sources:
 		if not src.next_record():
-			sources.remove(src)
-	while sources:
-		src = min(sources, key=lambda x: x.record['ts'])
+			sources_work.remove(src)
+	while sources_work:
+		src = min(sources_work, key=lambda x: x.record['ts'])
 		record = src.record
 		if not src.next_record():
-			sources.remove(src)
+			sources_work.remove(src)
 		yield record
 
+def fetch_records(sources):
+	record = None
+
+	for record in get_new_records(sources):
+		yield record
+
+	# after fetching all records wait 1 second for
+	# new records, so last returned record will be
+	# really last in this second
+	if record:
+		now = datetime.datetime.now()
+		one_sec = datetime.timedelta(seconds=1)
+		if now - record['ts'] < one_sec:
+			time.sleep(1)
+			until = (record['ts'] + one_sec).replace(microsecond=0)
+			for record in get_new_records(sources):
+				if record['ts'] >= until:
+					break
+				yield record
+
 def checklog(config, state=None):
-	records = fetch_records(config)
+	records = fetch_records(config.SOURCES)
 	record = None
 
 	try:
@@ -146,5 +173,6 @@ def checklog(config, state=None):
 				break
 	for record in records:
 		yield config.OUTPUT.format(record)
+
 	if record:
 		state['last_checklog'] = record['ts']

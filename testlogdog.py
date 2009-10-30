@@ -322,11 +322,6 @@ class TimestampField(unittest.TestCase):
 				('1 Jan 01', ts(2001, 1, 1)),
 				('02 Feb 99', ts(1999, 2, 2)),
 			]),
-			('%b %d %H:%M:%S', [
-				('Oct 17 12:30:00', ts(1900, 10, 17, 12, 30, 0)),
-				('Mar 1 1:01:01', ts(1900, 3, 1, 1, 1, 1)),
-				('Apr 02 02:03:04', ts(1900, 4, 2, 2, 3, 4)),
-			]),
 			('%Y-%m-%dT%H:%M:%S', [
 				('2002-12-25T00:00:00', ts(2002, 12, 25)),
 				('1999-01-02T03:04:05', ts(1999, 1, 2, 3, 4, 5)),
@@ -341,6 +336,30 @@ class TimestampField(unittest.TestCase):
 				expected = format_example[1][i][1]
 				self.assertEquals(f.parse(input), expected)
 	
+	def test_parse_unknown_year(self):
+		'''TimestampField should handle unknown year smart'''
+
+		ts = datetime.datetime
+		ts_format = '%b %d %H:%M:%S'
+
+		now = ts.now()
+		values = [
+			['Jan 1 1:01:01', ts(now.year, 1, 1, 1, 1, 1)],
+			['Mar 1 1:01:01', ts(now.year, 3, 1, 1, 1, 1)],
+			['Apr 02 02:03:04', ts(now.year, 4, 2, 2, 3, 4)],
+			['Oct 17 12:30:00', ts(now.year, 10, 17, 12, 30, 0)],
+			['Dec 31 23:59:59', ts(now.year, 12, 31, 23, 59, 59)],
+		]
+
+		for value in values:
+			t = value[1]
+			if t > now:
+				value[1] = t.replace(year=now.year-1)
+
+		f = logdog.TimestampField(ts_format)
+		for string, t in values:
+			self.assertEqual(f.parse(string), t)
+
 	def test_parse_invalid_format(self):
 		'''TimestampField should fail with invalid format'''
 
