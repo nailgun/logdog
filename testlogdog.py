@@ -16,7 +16,7 @@ import threading
 
 class TestConfig:
 	def __init__(self):
-		#self.SOURCES = None
+		self.SOURCES = []
 		self.OUTPUT = logdog.OriginalFormat()
 		pass
 
@@ -47,7 +47,7 @@ class ChecklogTest(unittest.TestCase):
 		config.SOURCES = [logsource]
 
 		expected = list(open(self.logfile_path, 'r'))
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(result, expected)
 	
 	def test_custom_output(self):
@@ -65,7 +65,7 @@ class ChecklogTest(unittest.TestCase):
 
 		file = open(self.logfile_path, 'r')
 		expected = [l[:15]+' test\n' for l in file]
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(result, expected)
 	
 	def test_several_files(self):
@@ -97,7 +97,7 @@ class ChecklogTest(unittest.TestCase):
 			config.SOURCES.append(logsource)
 
 		expected = list(open(self.logfile_path, 'r'))
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(result, expected)
 	
 	def test_save_state(self):
@@ -115,10 +115,10 @@ class ChecklogTest(unittest.TestCase):
 		logsource.pattern = self.pattern
 		logsource.fields['ts'] = logdog.TimestampField(self.ts_format)
 		config.SOURCES = [logsource]
-		list(logdog.checklog(config, state=self.state))
+		list(logdog.checklog.checklog(config, state=self.state))
 
 		logsource.file = open(fname, 'r')
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(len(result), 0)
 
 		file.writelines(lines[5:])
@@ -126,7 +126,7 @@ class ChecklogTest(unittest.TestCase):
 
 		expected = lines[5:]
 		logsource.file = open(fname, 'r')
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(result, expected)
 
 		file.close()
@@ -143,7 +143,7 @@ class ChecklogTest(unittest.TestCase):
 		logsource.fields['ts'] = logdog.TimestampField(self.ts_format)
 		config.SOURCES = [logsource]
 
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		self.assertEqual(len(result), 0)
 	
 	def test_race_condition(self):
@@ -156,6 +156,7 @@ class ChecklogTest(unittest.TestCase):
 			def __init__(self, filename, ts_format):
 				self.file = open(filename, 'w')
 				self.ts_format = ts_format
+				self.expected = [self.logger('test start')]
 				super(LoggerThread, self).__init__()
 
 			def logger(self, msg):
@@ -166,8 +167,17 @@ class ChecklogTest(unittest.TestCase):
 				return line
 			
 			def run(self):
-				time.sleep(0.3)
-				self.expected.append(self.logger('hello2'))
+				self.ts_end = datetime.datetime.now()
+				self.ts_end += datetime.timedelta(seconds=1)
+				self.ts_end = self.ts_end.replace(microsecond=0)
+				now = datetime.datetime.now
+				while now() < self.ts_end:
+					self.expected.append(self.logger(str(now().microsecond)))
+					time.sleep(0.05)
+				self.logger('next second 1')
+				self.logger('next second 2')
+				self.logger('next second 3')
+				self.logger('next second 4')
 
 		config = TestConfig()
 		logsource = logdog.LogSource(open(fname, 'r'))
@@ -176,10 +186,9 @@ class ChecklogTest(unittest.TestCase):
 		config.SOURCES = [logsource]
 
 		thread = LoggerThread(fname, self.ts_format)
-		thread.expected = [thread.logger('hello1')]
 		thread.start()
 
-		result = list(logdog.checklog(config, state=self.state))
+		result = list(logdog.checklog.checklog(config, state=self.state))
 		thread.join()
 
 		self.assertEqual(thread.expected, result)

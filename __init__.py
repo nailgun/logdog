@@ -5,6 +5,7 @@ logdog - system log maintenance tools
 import re
 import time
 import datetime
+import checklog
 
 class LogdogError(Exception):
 	pass
@@ -126,7 +127,7 @@ class TimestampField(Field):
 	def format(self, value):
 		return time.strftime(self.strftime, value.timetuple())
 
-def get_new_records(sources):
+def fetch(sources):
 	sources_work = list(sources)
 	for src in sources:
 		if not src.next_record():
@@ -138,10 +139,10 @@ def get_new_records(sources):
 			sources_work.remove(src)
 		yield record
 
-def fetch_records(sources):
+def fetch_time_safe(sources):
 	record = None
 
-	for record in get_new_records(sources):
+	for record in fetch(sources):
 		yield record
 
 	# after fetching all records wait 1 second for
@@ -153,26 +154,7 @@ def fetch_records(sources):
 		if now - record['ts'] < one_sec:
 			time.sleep(1)
 			until = (record['ts'] + one_sec).replace(microsecond=0)
-			for record in get_new_records(sources):
+			for record in fetch(sources):
 				if record['ts'] >= until:
 					break
 				yield record
-
-def checklog(config, state=None):
-	records = fetch_records(config.SOURCES)
-	record = None
-
-	try:
-		last_check = state['last_checklog']
-	except KeyError:
-		pass
-	else:
-		for record in records:
-			if record['ts'] > last_check:
-				yield config.OUTPUT.format(record)
-				break
-	for record in records:
-		yield config.OUTPUT.format(record)
-
-	if record:
-		state['last_checklog'] = record['ts']

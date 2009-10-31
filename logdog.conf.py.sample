@@ -1,0 +1,14 @@
+import logdog
+
+filename = '/var/log/messages'
+pattern = r'^(?P<ts>.{15}) (?P<host>.+) ' + \
+		r'((?P<prog>.+)(\[(?P<pid>\d+)\])?: )?' + \
+		r'(?P<msg>.*)'
+ts_format = '%b %d %H:%M:%S'
+
+source = logdog.LogSource(open(filename, 'r'))
+source.pattern = pattern
+source.fields['ts'] = logdog.TimestampField(ts_format)
+
+SOURCES = [source]
+OUTPUT = logdog.OriginalFormat()
