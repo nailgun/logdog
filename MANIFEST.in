@@ -1,0 +1,2 @@
+include logdog.conf.py.sample
+include testlog.txt
