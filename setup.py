@@ -7,6 +7,4 @@ setup(
 	author_email='nailgunster@gmail.com',
 	url='http://wae.org.ru/',
 	packages=['logdog'],
-	package_dir={'logdog': ''},
-	package_data={'logdog': ['testlog.txt']},
 )
