@@ -128,6 +128,9 @@ class ChecklogTest(unittest.TestCase):
 		logsource.file = open(fname, 'r')
 		result = list(logdog.checklog(config, state=self.state))
 		self.assertEqual(result, expected)
+
+		file.close()
+		os.remove(fname)
 	
 	def test_accepts_empty(self):
 		'''checklog should accept empty files'''
@@ -180,6 +183,9 @@ class ChecklogTest(unittest.TestCase):
 		thread.join()
 
 		self.assertEqual(thread.expected, result)
+
+		thread.file.close()
+		os.remove(fname)
 
 class LogSourceTest(unittest.TestCase):
 	def setUp(self):
