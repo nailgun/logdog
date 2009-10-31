@@ -12,6 +12,7 @@ import tempfile
 import random
 import os
 import datetime
+import threading
 
 class TestConfig:
 	def __init__(self):
@@ -147,13 +148,23 @@ class ChecklogTest(unittest.TestCase):
 		same time'''
 
 		fd, fname = tempfile.mkstemp()
-		file = open(fname, 'w')
-		def logger(msg):
-			ts = time.strftime(self.ts_format)
-			line = '%s alpha %s\n' % (ts, msg)
-			file.write(line)
-			file.flush()
-			return line
+
+		class LoggerThread(threading.Thread):
+			def __init__(self, filename, ts_format):
+				self.file = open(filename, 'w')
+				self.ts_format = ts_format
+				super(LoggerThread, self).__init__()
+
+			def logger(self, msg):
+				ts = time.strftime(self.ts_format)
+				line = '%s alpha %s\n' % (ts, msg)
+				self.file.write(line)
+				self.file.flush()
+				return line
+			
+			def run(self):
+				time.sleep(0.3)
+				self.expected.append(self.logger('hello2'))
 
 		config = TestConfig()
 		logsource = logdog.LogSource(open(fname, 'r'))
@@ -161,14 +172,14 @@ class ChecklogTest(unittest.TestCase):
 		logsource.fields['ts'] = logdog.TimestampField(self.ts_format)
 		config.SOURCES = [logsource]
 
-		expected = [logger('hello1')]
+		thread = LoggerThread(fname, self.ts_format)
+		thread.expected = [thread.logger('hello1')]
+		thread.start()
+
 		result = list(logdog.checklog(config, state=self.state))
+		thread.join()
 
-		expected.append(logger('hello2'))
-		logsource.file = open(fname, 'r')
-		result += list(logdog.checklog(config, state=self.state))
-
-		self.assertEqual(expected, result)
+		self.assertEqual(thread.expected, result)
 
 class LogSourceTest(unittest.TestCase):
 	def setUp(self):
