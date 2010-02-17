@@ -43,13 +43,13 @@ class LogSource(object):
 					(self.pattern, linenb))
 
 		record = LogRecord(line, match.groupdict())
-		for field in self.fields.keys():
+		for fname,field in self.fields.iteritems():
 			try:
-				string = record[field]
+				string = record[fname]
 			except KeyError:
 				pass
 			else:
-				record[field] = self.fields[field].parse(string)
+				record[fname] = field.parse(string)
 		return record
 
 	def next_record(self):

@@ -77,7 +77,8 @@ def fetch_1source_custom():
 			(record_count, duration, int(speed))
 
 def main():
-	fetch_1source_original()
+	import cProfile
+	cProfile.run('fetch_1source_original()', 'prof1')
 	fetch_2sources_original()
 	fetch_1source_custom()
 
